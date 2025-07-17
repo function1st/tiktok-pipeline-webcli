@@ -73,13 +73,8 @@ def main(req: HttpRequest) -> HttpResponse:
         logging.info(f"Executing command: {command[:50]}...")
         
         # Execute command via container API or CLI depending on command type
-        if command.startswith('python -m tiktok_pipeline.cli') or command.startswith('curl http'):
-            # For pipeline-specific commands, use direct API calls for better performance
-            result = execute_via_container_api(command)
-        else:
-            # For general shell commands, use Azure CLI exec (more secure than direct shell)
-            result = execute_via_azure_cli(command)
-        
+        # Execute ALL commands via Azure CLI exec for full terminal access
+        result = execute_via_azure_cli(command)        
         return HttpResponse(
             json.dumps({
                 "output": result.get('output', ''),
