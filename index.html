@@ -306,6 +306,7 @@
                 <h2>🔐 TikTok Pipeline Access</h2>
                 <p>Enter your secure access code to connect to the terminal:</p>
                 <form onsubmit="authenticate(); return false;">
+                    <input type="text" id="username" placeholder="Username" value="webcli" readonly style="opacity: 0.6;" autocomplete="username">
                     <input type="password" id="accessCode" placeholder="Secure Access Code" autocomplete="current-password">
                     <small style="color: #888; display: block; margin-top: 5px;">
                         🔒 End-to-end encrypted Azure communication<br>
@@ -370,9 +371,9 @@
         let currentTab = 'database';
         let currentPath = '';
         
-        // Direct Container App URLs
-        const CONTAINER_APP_URL = 'https://4.227.71.172:7681'; // ttyd terminal (HTTPS)
-        const CONTAINER_API_URL = 'http://4.227.71.172:8000'; // FastAPI
+        // Direct Container App URLs (Secure Backend)
+        const CONTAINER_APP_URL = 'https://4.227.76.42:7681'; // ttyd terminal (HTTPS)
+        const CONTAINER_API_URL = 'https://4.227.76.42:8000'; // FastAPI with HTTPS
         
         function initTerminal() {
             term = new Terminal({
@@ -544,7 +545,11 @@
             
             const url = currentPath ? `${endpoint}?path=${encodeURIComponent(currentPath)}` : endpoint;
             
-            fetch(url)
+            fetch(url, {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`
+                }
+            })
                 .then(response => response.json())
                 .then(data => {
                     displayFiles(data);
@@ -646,13 +651,32 @@
             
             const url = `${endpoint}?path=${encodeURIComponent(path)}`;
             
-            // Create a temporary link and click it to trigger download
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = path.split('/').pop();
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            // Use fetch with authentication to download the file
+            fetch(url, {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Download failed: ${response.statusText}`);
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                // Create a temporary link and click it to trigger download
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = path.split('/').pop();
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href);
+            })
+            .catch(error => {
+                console.error('Download failed:', error);
+                alert('Failed to download file: ' + error.message);
+            });
         }
         
         function refreshFiles() {
