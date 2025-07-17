@@ -371,9 +371,9 @@
         let currentTab = 'database';
         let currentPath = '';
         
-        // Direct Container App URLs (Secure Authenticated Backend)
-        const CONTAINER_APP_URL = 'https://4.227.28.244:7681'; // ttyd terminal (HTTPS + AUTH)
-        const CONTAINER_API_URL = 'http://4.227.28.244:8000'; // FastAPI (HTTP for compatibility)
+        // Direct Container App URLs (Fully HTTPS Secured Backend)
+        const CONTAINER_APP_URL = 'https://20.14.35.55:7681'; // ttyd terminal (HTTPS + Basic Auth)
+        const CONTAINER_API_URL = 'https://20.14.35.55:8000'; // FastAPI (HTTPS + Bearer Auth)
         
         function initTerminal() {
             term = new Terminal({
