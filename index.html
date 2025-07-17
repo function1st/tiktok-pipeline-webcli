@@ -260,11 +260,9 @@
                 // Hide terminal and show ttyd iframe
                 document.getElementById('terminal').style.display = 'none';
                 
-                // Create iframe for ttyd terminal with Basic Auth
+                // Create iframe for ttyd terminal (no auth needed - protected by frontend)
                 const iframe = document.createElement('iframe');
-                // ttyd uses Basic Auth, so embed credentials in URL
-                const authUrl = CONTAINER_APP_URL.replace('https://', `https://${encodeURIComponent(accessToken)}:${encodeURIComponent(accessToken)}@`);
-                iframe.src = authUrl;
+                iframe.src = CONTAINER_APP_URL;
                 iframe.style.cssText = `
                     width: 100%;
                     height: 100%;
