@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok Pipeline Web CLI</title>
+    <link rel="stylesheet" href="https://unpkg.com/xterm@4.19.0/css/xterm.css">
+    <script src="https://unpkg.com/xterm@4.19.0/lib/xterm.js"></script>
+    <script src="https://unpkg.com/xterm-addon-fit@0.5.0/lib/xterm-addon-fit.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Courier New', monospace;
+            background: #1e1e1e;
+            overflow: hidden;
+        }
+        .header {
+            background: #2d2d30;
+            color: #cccccc;
+            padding: 10px 20px;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 18px;
+            color: #569cd6;
+        }
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #dc3545;
+        }
+        .status-indicator.connected {
+            background: #28a745;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            background: #0078d4;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .btn:hover {
+            background: #106ebe;
+        }
+        .btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        #terminal-container {
+            height: calc(100vh - 60px);
+            padding: 0;
+        }
+        #terminal {
+            height: 100%;
+            width: 100%;
+        }
+        
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 10px;
+                padding: 10px;
+            }
+            .header h1 {
+                font-size: 16px;
+            }
+            .status {
+                gap: 10px;
+            }
+            .btn {
+                font-size: 14px;
+                padding: 8px 12px;
+            }
+            #terminal-container {
+                height: calc(100vh - 80px);
+            }
+        }
+        
+        /* Authentication modal */
+        .auth-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .auth-modal.hidden {
+            display: none;
+        }
+        .auth-form {
+            background: #2d2d30;
+            padding: 30px;
+            border-radius: 8px;
+            color: #cccccc;
+            min-width: 300px;
+        }
+        .auth-form h2 {
+            margin-top: 0;
+            color: #569cd6;
+        }
+        .auth-form input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            background: #1e1e1e;
+            border: 1px solid #3e3e42;
+            color: #cccccc;
+            border-radius: 3px;
+        }
+        .auth-form button {
+            width: 100%;
+            background: #0078d4;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .error {
+            color: #dc3545;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Authentication Modal -->
+    <div id="authModal" class="auth-modal">
+        <div class="auth-form">
+            <h2>🔐 TikTok Pipeline Access</h2>
+            <p>Enter your secure access code to connect to the terminal:</p>
+            <input type="password" id="accessCode" placeholder="Secure Access Code" autocomplete="current-password">
+            <small style="color: #888; display: block; margin-top: 5px;">
+                🔒 End-to-end encrypted Azure communication
+            </small>
+            <div id="authError" class="error hidden"></div>
+            <button onclick="authenticate()">Connect</button>
+        </div>
+    </div>
+
+    <!-- Main Interface -->
+    <div class="header">
+        <h1>🎬 TikTok Pipeline Web CLI</h1>
+        <div class="status">
+            <div>
+                <span class="status-indicator" id="statusIndicator"></span>
+                <span id="statusText">Disconnected</span>
+            </div>
+            <div class="controls">
+                <button class="btn" onclick="clearTerminal()">Clear</button>
+                <button class="btn" onclick="reconnect()">Reconnect</button>
+                <button class="btn" onclick="showHelp()">Help</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="terminal-container">
+        <div id="terminal"></div>
+    </div>
+
+    <script>
+        let term, fitAddon, socket;
+        let accessToken = '';
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+        
+        // Azure Function endpoint (secure Azure-to-Azure communication)
+        const BACKEND_URL = 'https://tiktok-pipeline-functions.azurewebsites.net/api/webcli';
+        
+        function initTerminal() {
+            term = new Terminal({
+                theme: {
+                    background: '#1e1e1e',
+                    foreground: '#cccccc',
+                    cursor: '#ffffff',
+                    selection: '#264f78'
+                },
+                fontSize: 14,
+                fontFamily: '"Cascadia Code", "Consolas", "Courier New", monospace',
+                cursorBlink: true,
+                cursorStyle: 'block',
+                scrollback: 1000
+            });
+            
+            fitAddon = new FitAddon.FitAddon();
+            term.loadAddon(fitAddon);
+            term.open(document.getElementById('terminal'));
+            fitAddon.fit();
+            
+            // Welcome message
+            term.writeln('\x1b[1;36m╭─────────────────────────────────────────────────────────────╮\x1b[0m');
+            term.writeln('\x1b[1;36m│\x1b[0m \x1b[1;33m🎬 TikTok Pipeline Web CLI\x1b[0m                               \x1b[1;36m│\x1b[0m');
+            term.writeln('\x1b[1;36m├─────────────────────────────────────────────────────────────┤\x1b[0m');
+            term.writeln('\x1b[1;36m│\x1b[0m \x1b[37mSecure terminal access to your Azure deployment\x1b[0m         \x1b[1;36m│\x1b[0m');
+            term.writeln('\x1b[1;36m│\x1b[0m \x1b[90mConnecting to backend...\x1b[0m                                \x1b[1;36m│\x1b[0m');
+            term.writeln('\x1b[1;36m╰─────────────────────────────────────────────────────────────╯\x1b[0m');
+            term.writeln('');
+            
+            window.addEventListener('resize', () => {
+                setTimeout(() => fitAddon.fit(), 100);
+            });
+        }
+        
+        function authenticate() {
+            const code = document.getElementById('accessCode').value;
+            if (!code) {
+                showAuthError('Please enter an access code');
+                return;
+            }
+            
+            accessToken = code;
+            document.getElementById('authModal').classList.add('hidden');
+            connectWebSocket();
+        }
+        
+        function showAuthError(message) {
+            const errorEl = document.getElementById('authError');
+            errorEl.textContent = message;
+            errorEl.classList.remove('hidden');
+        }
+        
+        function connectWebSocket() {
+                         try {
+                 updateStatus('Connecting...', false);
+                 
+                 // Connect to Azure Function HTTP endpoint (not websocket for now)
+                 term.writeln('\x1b[33m→ Testing connection to backend...\x1b[0m');
+                 
+                                   // Test the backend with a simple command
+                  fetch(BACKEND_URL + '?token=' + encodeURIComponent(accessToken) + '&cmd=echo "🎬 Connected to TikTok Pipeline!"')
+                     .then(response => response.json())
+                     .then(data => {
+                         if (data.output) {
+                             updateStatus('Connected', true);
+                             term.writeln('\x1b[32m✓ Backend connection successful\x1b[0m');
+                             term.writeln('\x1b[90mUse the input below to send commands:\x1b[0m');
+                             term.writeln('');
+                             createCommandInput();
+                         } else {
+                             throw new Error(data.error || 'Unknown error');
+                         }
+                     })
+                     .catch(error => {
+                         updateStatus('Error', false);
+                         term.writeln('\x1b[31m✗ Connection failed: ' + error.message + '\x1b[0m');
+                     });
+                 
+                 return; // Skip websocket for now
+                 const wsUrl = BACKEND_URL + '?token=' + encodeURIComponent(accessToken);
+                 socket = new WebSocket(wsUrl);
+                
+                socket.onopen = () => {
+                    updateStatus('Connected', true);
+                    reconnectAttempts = 0;
+                    term.writeln('\x1b[32m✓ Connected to secure terminal\x1b[0m');
+                    term.writeln('\x1b[90mType commands or use the TikTok Pipeline CLI:\x1b[0m');
+                    term.writeln('\x1b[36m  python -m tiktok_pipeline.cli --help\x1b[0m');
+                    term.writeln('');
+                };
+                
+                socket.onmessage = (event) => {
+                    term.write(event.data);
+                };
+                
+                socket.onclose = (event) => {
+                    updateStatus('Disconnected', false);
+                    term.writeln('\x1b[31m✗ Connection closed\x1b[0m');
+                    
+                    if (event.code === 1006 && reconnectAttempts < maxReconnectAttempts) {
+                        setTimeout(() => {
+                            reconnectAttempts++;
+                            term.writeln(`\x1b[33m↻ Reconnecting (${reconnectAttempts}/${maxReconnectAttempts})...\x1b[0m`);
+                            connectWebSocket();
+                        }, 2000 * reconnectAttempts);
+                    }
+                };
+                
+                socket.onerror = (error) => {
+                    updateStatus('Error', false);
+                    term.writeln('\x1b[31m✗ Connection error - check backend deployment\x1b[0m');
+                };
+                
+                term.onData(data => {
+                    if (socket && socket.readyState === WebSocket.OPEN) {
+                        socket.send(data);
+                    }
+                });
+                
+            } catch (error) {
+                updateStatus('Error', false);
+                term.writeln('\x1b[31m✗ Failed to connect: ' + error.message + '\x1b[0m');
+            }
+        }
+        
+        function updateStatus(text, connected) {
+            document.getElementById('statusText').textContent = text;
+            const indicator = document.getElementById('statusIndicator');
+            if (connected) {
+                indicator.classList.add('connected');
+            } else {
+                indicator.classList.remove('connected');
+            }
+        }
+        
+        function clearTerminal() {
+            if (term) {
+                term.clear();
+            }
+        }
+        
+        function reconnect() {
+            if (socket) {
+                socket.close();
+            }
+            reconnectAttempts = 0;
+            connectWebSocket();
+        }
+        
+        function showHelp() {
+            term.writeln('');
+                         term.writeln('\x1b[1;36m╭─── TikTok Pipeline CLI Help ───╮\x1b[0m');
+             term.writeln('\x1b[1;36m│\x1b[0m \x1b[33mPipeline Commands:\x1b[0m              \x1b[1;36m│\x1b[0m');
+             term.writeln('\x1b[1;36m│\x1b[0m \x1b[36m• python -m tiktok_pipeline.cli stats\x1b[0m \x1b[1;36m│\x1b[0m');
+             term.writeln('\x1b[1;36m│\x1b[0m \x1b[36m• python -m tiktok_pipeline.cli run\x1b[0m   \x1b[1;36m│\x1b[0m');
+             term.writeln('\x1b[1;36m│\x1b[0m \x1b[36m• python -m tiktok_pipeline.cli categories\x1b[0m\x1b[1;36m│\x1b[0m');
+             term.writeln('\x1b[1;36m│\x1b[0m \x1b[33mContainer Info:\x1b[0m                 \x1b[1;36m│\x1b[0m');
+             term.writeln('\x1b[1;36m│\x1b[0m \x1b[36m• curl http://20.171.201.193:8000/health\x1b[0m \x1b[1;36m│\x1b[0m');
+             term.writeln('\x1b[1;36m│\x1b[0m \x1b[36m• curl http://20.171.201.193:8000/stats\x1b[0m  \x1b[1;36m│\x1b[0m');
+             term.writeln('\x1b[1;36m╰─────────────────────────────────╯\x1b[0m');
+            term.writeln('');
+        }
+        
+                 function createCommandInput() {
+             // Create command input interface
+             const commandInput = document.createElement('input');
+             commandInput.style.cssText = `
+                 position: fixed;
+                 bottom: 10px;
+                 left: 10px;
+                 right: 10px;
+                 padding: 10px;
+                 background: #1e1e1e;
+                 border: 1px solid #3e3e42;
+                 color: #cccccc;
+                 border-radius: 3px;
+                 font-family: monospace;
+             `;
+             commandInput.placeholder = 'Enter command and press Enter...';
+             
+             commandInput.addEventListener('keypress', (e) => {
+                 if (e.key === 'Enter') {
+                     const command = commandInput.value;
+                     if (command.trim()) {
+                         executeCommand(command);
+                         commandInput.value = '';
+                     }
+                 }
+             });
+             
+             document.body.appendChild(commandInput);
+             commandInput.focus();
+         }
+         
+         function executeCommand(command) {
+             term.writeln(`\x1b[36m$ ${command}\x1b[0m`);
+             
+             fetch(BACKEND_URL + '?token=' + encodeURIComponent(accessToken) + '&cmd=' + encodeURIComponent(command))
+                 .then(response => response.json())
+                 .then(data => {
+                     if (data.output) {
+                         term.write(data.output);
+                     }
+                     if (data.error) {
+                         term.writeln(`\x1b[31m${data.error}\x1b[0m`);
+                     }
+                 })
+                 .catch(error => {
+                     term.writeln(`\x1b[31m✗ Error: ${error.message}\x1b[0m`);
+                 });
+         }
+         
+         // Initialize on page load
+         document.addEventListener('DOMContentLoaded', () => {
+             initTerminal();
+             
+             // Show auth modal
+             document.getElementById('authModal').classList.remove('hidden');
+             
+             // Focus on access code input
+             document.getElementById('accessCode').focus();
+             
+             // Enter key in auth form
+             document.getElementById('accessCode').addEventListener('keypress', (e) => {
+                 if (e.key === 'Enter') {
+                     authenticate();
+                 }
+             });
+         });
+    </script>
+</body>
+</html> 

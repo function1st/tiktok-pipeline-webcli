@@ -1,0 +1,22 @@
+{
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/images/*.{png,jpg,gif}", "/css/*"]
+  },
+  "routes": [
+    {
+      "route": "/",
+      "serve": "/index.html"
+    }
+  ],
+  "mimeTypes": {
+    ".html": "text/html",
+    ".js": "text/javascript",
+    ".css": "text/css"
+  },
+  "defaultHeaders": {
+    "content-security-policy": "default-src 'self' 'unsafe-inline' unpkg.com; connect-src 'self' wss://*.azurewebsites.net",
+    "x-frame-options": "DENY",
+    "x-content-type-options": "nosniff"
+  }
+} 
