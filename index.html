@@ -192,6 +192,10 @@
         // Azure Function endpoint (secure Azure-to-Azure communication)
         const BACKEND_URL = 'https://tiktok-pipeline-functions.azurewebsites.net/api/webcli';
         
+        // Direct Container App URLs
+        const CONTAINER_APP_URL = 'http://4.227.71.172:7681'; // ttyd terminal
+        const CONTAINER_API_URL = 'http://4.227.71.172:8000'; // FastAPI
+        
         function initTerminal() {
             term = new Terminal({
                 theme: {
@@ -235,7 +239,7 @@
             
             accessToken = code;
             document.getElementById('authModal').classList.add('hidden');
-            connectWebSocket();
+            connectToTerminal();
         }
         
         function showAuthError(message) {
@@ -244,76 +248,39 @@
             errorEl.classList.remove('hidden');
         }
         
-        function connectWebSocket() {
-                         try {
-                 updateStatus('Connecting...', false);
-                 
-                 // Connect to Azure Function HTTP endpoint (not websocket for now)
-                 term.writeln('\x1b[33m→ Testing connection to backend...\x1b[0m');
-                 
-                                   // Test the backend with a simple command
-                  fetch(BACKEND_URL + '?token=' + encodeURIComponent(accessToken) + '&cmd=echo "🎬 Connected to TikTok Pipeline!"')
-                     .then(response => response.json())
-                     .then(data => {
-                         if (data.authenticated) {
-                             updateStatus('Connected', true);
-                             term.writeln('\x1b[32m✓ Backend connection successful\x1b[0m');
-                             term.writeln('\x1b[90mUse the input below to send commands:\x1b[0m');
-                             term.writeln('');
-                             createCommandInput();
-                         } else {
-                             throw new Error(data.error || 'Unknown error');
-                         }
-                     })
-                     .catch(error => {
-                         updateStatus('Error', false);
-                         term.writeln('\x1b[31m✗ Connection failed: ' + error.message + '\x1b[0m');
-                     });
-                 
-                 return; // Skip websocket for now
-                 const wsUrl = BACKEND_URL + '?token=' + encodeURIComponent(accessToken);
-                 socket = new WebSocket(wsUrl);
+        function connectToTerminal() {
+            try {
+                updateStatus('Connecting...', false);
                 
-                socket.onopen = () => {
+                term.writeln('\x1b[33m→ Connecting to TikTok Pipeline Terminal...\x1b[0m');
+                
+                // Hide terminal and show ttyd iframe
+                document.getElementById('terminal').style.display = 'none';
+                
+                // Create iframe for ttyd terminal
+                const iframe = document.createElement('iframe');
+                iframe.src = `${CONTAINER_APP_URL}/?arg=${encodeURIComponent(accessToken)}`;
+                iframe.style.cssText = `
+                    width: 100%;
+                    height: 100%;
+                    border: none;
+                    background: #1e1e1e;
+                `;
+                iframe.onload = () => {
                     updateStatus('Connected', true);
-                    reconnectAttempts = 0;
-                    term.writeln('\x1b[32m✓ Connected to secure terminal\x1b[0m');
-                    term.writeln('\x1b[90mType commands or use the TikTok Pipeline CLI:\x1b[0m');
-                    term.writeln('\x1b[36m  python -m tiktok_pipeline.cli --help\x1b[0m');
-                    term.writeln('');
                 };
-                
-                socket.onmessage = (event) => {
-                    term.write(event.data);
-                };
-                
-                socket.onclose = (event) => {
-                    updateStatus('Disconnected', false);
-                    term.writeln('\x1b[31m✗ Connection closed\x1b[0m');
-                    
-                    if (event.code === 1006 && reconnectAttempts < maxReconnectAttempts) {
-                        setTimeout(() => {
-                            reconnectAttempts++;
-                            term.writeln(`\x1b[33m↻ Reconnecting (${reconnectAttempts}/${maxReconnectAttempts})...\x1b[0m`);
-                            connectWebSocket();
-                        }, 2000 * reconnectAttempts);
-                    }
-                };
-                
-                socket.onerror = (error) => {
+                iframe.onerror = () => {
                     updateStatus('Error', false);
-                    term.writeln('\x1b[31m✗ Connection error - check backend deployment\x1b[0m');
+                    term.writeln('\x1b[31m✗ Failed to connect to terminal server\x1b[0m');
+                    document.getElementById('terminal').style.display = 'block';
                 };
                 
-                term.onData(data => {
-                    if (socket && socket.readyState === WebSocket.OPEN) {
-                        socket.send(data);
-                    }
-                });
+                document.getElementById('terminal-container').appendChild(iframe);
                 
             } catch (error) {
                 updateStatus('Error', false);
                 term.writeln('\x1b[31m✗ Failed to connect: ' + error.message + '\x1b[0m');
+                document.getElementById('terminal').style.display = 'block';
             }
         }
         
@@ -334,11 +301,14 @@
         }
         
         function reconnect() {
-            if (socket) {
-                socket.close();
+            // Remove existing iframe if any
+            const existingIframe = document.querySelector('#terminal-container iframe');
+            if (existingIframe) {
+                existingIframe.remove();
             }
+            document.getElementById('terminal').style.display = 'block';
             reconnectAttempts = 0;
-            connectWebSocket();
+            connectToTerminal();
         }
         
         function showHelp() {
@@ -355,54 +325,7 @@
             term.writeln('');
         }
         
-                 function createCommandInput() {
-             // Create command input interface
-             const commandInput = document.createElement('input');
-             commandInput.style.cssText = `
-                 position: fixed;
-                 bottom: 10px;
-                 left: 10px;
-                 right: 10px;
-                 padding: 10px;
-                 background: #1e1e1e;
-                 border: 1px solid #3e3e42;
-                 color: #cccccc;
-                 border-radius: 3px;
-                 font-family: monospace;
-             `;
-             commandInput.placeholder = 'Enter command and press Enter...';
-             
-             commandInput.addEventListener('keypress', (e) => {
-                 if (e.key === 'Enter') {
-                     const command = commandInput.value;
-                     if (command.trim()) {
-                         executeCommand(command);
-                         commandInput.value = '';
-                     }
-                 }
-             });
-             
-             document.body.appendChild(commandInput);
-             commandInput.focus();
-         }
-         
-         function executeCommand(command) {
-             term.writeln(`\x1b[36m$ ${command}\x1b[0m`);
-             
-             fetch(BACKEND_URL + '?token=' + encodeURIComponent(accessToken) + '&cmd=' + encodeURIComponent(command))
-                 .then(response => response.json())
-                 .then(data => {
-                     if (data.output) {
-                         term.write(data.output);
-                     }
-                     if (data.error) {
-                         term.writeln(`\x1b[31m${data.error}\x1b[0m`);
-                     }
-                 })
-                 .catch(error => {
-                     term.writeln(`\x1b[31m✗ Error: ${error.message}\x1b[0m`);
-                 });
-         }
+         // ttyd handles terminal interaction directly - no custom input needed
          
          // Initialize on page load
          document.addEventListener('DOMContentLoaded', () => {
