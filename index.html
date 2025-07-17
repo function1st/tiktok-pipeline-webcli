@@ -255,7 +255,7 @@
                   fetch(BACKEND_URL + '?token=' + encodeURIComponent(accessToken) + '&cmd=echo "🎬 Connected to TikTok Pipeline!"')
                      .then(response => response.json())
                      .then(data => {
-                         if (data.output) {
+                         if (data.authenticated) {
                              updateStatus('Connected', true);
                              term.writeln('\x1b[32m✓ Backend connection successful\x1b[0m');
                              term.writeln('\x1b[90mUse the input below to send commands:\x1b[0m');
