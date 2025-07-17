@@ -376,48 +376,51 @@
         const CONTAINER_API_URL = 'https://api.gentik.sayboard.com'; // FastAPI (HTTPS + Bearer Auth)
         
         function initTerminal() {
-            term = new Terminal({
-                theme: {
-                    background: '#1e1e1e',
-                    foreground: '#cccccc',
-                    cursor: '#ffffff',
-                    selection: '#264f78'
-                },
-                fontSize: 14,
-                fontFamily: '"Cascadia Code", "Consolas", "Courier New", monospace',
-                cursorBlink: true,
-                cursorStyle: 'block',
-                scrollback: 1000
-            });
-            
-            fitAddon = new FitAddon.FitAddon();
-            term.loadAddon(fitAddon);
-            term.open(document.getElementById('terminal'));
-            fitAddon.fit();
-            
-            // Fix Canvas performance warnings by setting willReadFrequently
-            setTimeout(() => {
-                const canvases = document.querySelectorAll('#terminal canvas');
-                canvases.forEach(canvas => {
-                    const ctx = canvas.getContext('2d');
-                    if (ctx) {
-                        // Create new context with willReadFrequently option
-                        const newCanvas = document.createElement('canvas');
-                        const newCtx = newCanvas.getContext('2d', { willReadFrequently: true });
-                        // Replace the canvas context
-                        canvas.style.willReadFrequently = 'true';
-                    }
+            // Only initialize xterm.js if we have a real terminal connection
+            if (CONTAINER_APP_URL) {
+                term = new Terminal({
+                    theme: {
+                        background: '#1e1e1e',
+                        foreground: '#cccccc',
+                        cursor: '#ffffff',
+                        selection: '#264f78'
+                    },
+                    fontSize: 14,
+                    fontFamily: '"Cascadia Code", "Consolas", "Courier New", monospace',
+                    cursorBlink: true,
+                    cursorStyle: 'block',
+                    scrollback: 1000
                 });
-            }, 100);
-            
-            // Handle window resize
-            window.addEventListener('resize', () => {
+                
+                fitAddon = new FitAddon.FitAddon();
+                term.loadAddon(fitAddon);
+                term.open(document.getElementById('terminal'));
                 fitAddon.fit();
-            });
-            
-            // Show initial message
-            term.writeln('🎬 TikTok Pipeline Web CLI');
-            term.writeln('Please authenticate to connect to the terminal server...');
+                
+                // Fix Canvas performance warnings by setting willReadFrequently
+                setTimeout(() => {
+                    const canvases = document.querySelectorAll('#terminal canvas');
+                    canvases.forEach(canvas => {
+                        const ctx = canvas.getContext('2d');
+                        if (ctx) {
+                            // Create new context with willReadFrequently option
+                            const newCanvas = document.createElement('canvas');
+                            const newCtx = newCanvas.getContext('2d', { willReadFrequently: true });
+                            // Replace the canvas context
+                            canvas.style.willReadFrequently = 'true';
+                        }
+                    });
+                }, 100);
+                
+                // Handle window resize
+                window.addEventListener('resize', () => {
+                    fitAddon.fit();
+                });
+                
+                // Show initial message
+                term.writeln('🎬 TikTok Pipeline Web CLI');
+                term.writeln('Please authenticate to connect to the terminal server...');
+            }
         }
         
         function authenticate() {
@@ -463,8 +466,9 @@
                 document.getElementById('terminal').style.display = 'none';
                 
                 // Create iframe for ttyd terminal (no auth needed - protected by frontend)
+                let iframe;
                 if (CONTAINER_APP_URL) {
-                    const iframe = document.createElement('iframe');
+                    iframe = document.createElement('iframe');
                     iframe.src = CONTAINER_APP_URL;
                     iframe.style.cssText = `
                         width: 100%;
@@ -474,8 +478,8 @@
                     `;
                 } else {
                     // Terminal not available in Container Apps due to port limitations
-                    const messageDiv = document.createElement('div');
-                    messageDiv.style.cssText = `
+                    iframe = document.createElement('div');
+                    iframe.style.cssText = `
                         width: 100%;
                         height: 100%;
                         background: #1e1e1e;
@@ -488,13 +492,12 @@
                         text-align: center;
                         padding: 20px;
                     `;
-                    messageDiv.innerHTML = `
+                    iframe.innerHTML = `
                         <h3 style="color: #569cd6; margin-bottom: 15px;">🖥️ Terminal Currently Unavailable</h3>
                         <p style="margin-bottom: 10px;">Container Apps ingress only supports single-port access.</p>
                         <p style="margin-bottom: 15px;">Use the file browser and API features above.</p>
                         <small style="color: #888;">Terminal access requires Container Instances or AKS deployment.</small>
                     `;
-                    const iframe = messageDiv;
                 }
                 
                 // Set up event handlers only for real iframe
