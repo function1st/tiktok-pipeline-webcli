@@ -154,12 +154,15 @@
         <div class="auth-form">
             <h2>🔐 TikTok Pipeline Access</h2>
             <p>Enter your secure access code to connect to the terminal:</p>
-            <input type="password" id="accessCode" placeholder="Secure Access Code" autocomplete="current-password">
-            <small style="color: #888; display: block; margin-top: 5px;">
-                🔒 End-to-end encrypted Azure communication
-            </small>
-            <div id="authError" class="error hidden"></div>
-            <button onclick="authenticate()">Connect</button>
+            <form onsubmit="authenticate(); return false;">
+                <input type="password" id="accessCode" placeholder="Secure Access Code" autocomplete="current-password">
+                <small style="color: #888; display: block; margin-top: 5px;">
+                    🔒 End-to-end encrypted Azure communication<br>
+                    💡 You may see a security warning - click "Advanced" → "Proceed" to continue
+                </small>
+                <div id="authError" class="error hidden"></div>
+                <button type="submit">Connect</button>
+            </form>
         </div>
     </div>
 
@@ -257,9 +260,11 @@
                 // Hide terminal and show ttyd iframe
                 document.getElementById('terminal').style.display = 'none';
                 
-                // Create iframe for ttyd terminal
+                // Create iframe for ttyd terminal with Basic Auth
                 const iframe = document.createElement('iframe');
-                iframe.src = `${CONTAINER_APP_URL}/?arg=${encodeURIComponent(accessToken)}`;
+                // ttyd uses Basic Auth, so embed credentials in URL
+                const authUrl = CONTAINER_APP_URL.replace('https://', `https://${encodeURIComponent(accessToken)}:${encodeURIComponent(accessToken)}@`);
+                iframe.src = authUrl;
                 iframe.style.cssText = `
                     width: 100%;
                     height: 100%;
@@ -268,12 +273,22 @@
                 `;
                 iframe.onload = () => {
                     updateStatus('Connected', true);
+                    console.log('Terminal iframe loaded successfully');
                 };
                 iframe.onerror = () => {
                     updateStatus('Error', false);
                     term.writeln('\x1b[31m✗ Failed to connect to terminal server\x1b[0m');
+                    term.writeln('\x1b[33m💡 If you see certificate warnings, click "Advanced" → "Proceed to site"\x1b[0m');
                     document.getElementById('terminal').style.display = 'block';
                 };
+                
+                // Add timeout fallback for iframe loading
+                setTimeout(() => {
+                    if (iframe.style.display !== 'none') {
+                        console.log('Iframe load timeout - this may be normal for HTTPS with self-signed certificates');
+                        updateStatus('Loading...', false);
+                    }
+                }, 5000);
                 
                 document.getElementById('terminal-container').appendChild(iframe);
                 
