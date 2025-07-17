@@ -371,9 +371,9 @@
         let currentTab = 'database';
         let currentPath = '';
         
-        // Direct Container App URLs (Secure Backend)
-        const CONTAINER_APP_URL = 'https://4.227.76.42:7681'; // ttyd terminal (HTTPS)
-        const CONTAINER_API_URL = 'https://4.227.76.42:8000'; // FastAPI with HTTPS
+        // Direct Container App URLs (Fixed Backend)
+        const CONTAINER_APP_URL = 'https://20.14.32.218:7681'; // ttyd terminal (HTTPS)
+        const CONTAINER_API_URL = 'http://20.14.32.218:8000'; // FastAPI (HTTP for compatibility)
         
         function initTerminal() {
             term = new Terminal({
@@ -394,6 +394,21 @@
             term.loadAddon(fitAddon);
             term.open(document.getElementById('terminal'));
             fitAddon.fit();
+            
+            // Fix Canvas performance warnings by setting willReadFrequently
+            setTimeout(() => {
+                const canvases = document.querySelectorAll('#terminal canvas');
+                canvases.forEach(canvas => {
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                        // Create new context with willReadFrequently option
+                        const newCanvas = document.createElement('canvas');
+                        const newCtx = newCanvas.getContext('2d', { willReadFrequently: true });
+                        // Replace the canvas context
+                        canvas.style.willReadFrequently = 'true';
+                    }
+                });
+            }, 100);
             
             // Handle window resize
             window.addEventListener('resize', () => {
