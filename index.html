@@ -364,6 +364,18 @@
     </div>
 
     <script>
+        // Fix Canvas2D performance warnings globally before xterm.js loads
+        (function() {
+            const originalGetContext = HTMLCanvasElement.prototype.getContext;
+            HTMLCanvasElement.prototype.getContext = function(type, attributes) {
+                if (type === '2d') {
+                    attributes = attributes || {};
+                    attributes.willReadFrequently = true;
+                }
+                return originalGetContext.call(this, type, attributes);
+            };
+        })();
+
         let term, fitAddon;
         let accessToken = '';
         let reconnectAttempts = 0;
@@ -412,18 +424,7 @@
                     }
                 }, 50);
                 
-                // Fix Canvas performance warnings
-                setTimeout(() => {
-                    const canvases = document.querySelectorAll('#terminal canvas');
-                    canvases.forEach(canvas => {
-                        try {
-                            const ctx = canvas.getContext('2d', { willReadFrequently: true });
-                            canvas.willReadFrequently = true;
-                        } catch (e) {
-                            console.log('Canvas optimization skipped');
-                        }
-                    });
-                }, 200);
+                // Canvas performance warnings are now fixed globally
                 
                 // Handle window resize with debouncing
                 let resizeTimeout;
@@ -485,20 +486,40 @@
                 
                 // Show xterm.js terminal
                 const terminalElement = document.getElementById('terminal');
-                if (terminalElement) {
-                    terminalElement.style.display = 'block';
+                if (!terminalElement) {
+                    console.error('Terminal element not found during connection. Checking if it exists in DOM...');
+                    console.log('All elements with terminal in ID:', document.querySelectorAll('[id*="terminal"]'));
+                    console.log('Available terminal-related elements:', document.querySelectorAll('.terminal, #terminal-container, [class*="terminal"]'));
+                    
+                    // Try to recreate the terminal element if it's missing
+                    const terminalContainer = document.getElementById('terminal-container');
+                    if (terminalContainer) {
+                        console.log('Recreating missing terminal element...');
+                        const newTerminalElement = document.createElement('div');
+                        newTerminalElement.id = 'terminal';
+                        terminalContainer.appendChild(newTerminalElement);
+                        newTerminalElement.style.display = 'block';
+                    } else {
+                        console.error('Terminal container also not found!');
+                        return;
+                    }
                 } else {
-                    console.error('Terminal element not found during connection');
-                    return;
+                    terminalElement.style.display = 'block';
                 }
                 
                 if (CONTAINER_APP_URL) {
-                    // Ensure terminal is initialized
-                    if (!term) {
-                        console.log('Initializing terminal first...');
+                    // Ensure terminal is initialized and available
+                    const finalTerminalElement = document.getElementById('terminal');
+                    if (!term || !finalTerminalElement) {
+                        console.log('Terminal needs reinitialization...');
+                        if (!finalTerminalElement) {
+                            console.error('Terminal element still missing after recreation attempt');
+                            updateStatus('Error', false);
+                            return;
+                        }
                         initTerminal();
                         // Wait a moment for initialization
-                        setTimeout(() => connectToTerminal(), 100);
+                        setTimeout(() => connectToTerminal(), 200);
                         return;
                     }
                     
