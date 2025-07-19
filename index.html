@@ -378,6 +378,12 @@
         function initTerminal() {
             // Only initialize xterm.js if we have a real terminal connection
             if (CONTAINER_APP_URL) {
+                const terminalElement = document.getElementById('terminal');
+                if (!terminalElement) {
+                    console.error('Terminal element not found');
+                    return;
+                }
+                
                 term = new Terminal({
                     theme: {
                         background: '#1e1e1e',
@@ -394,27 +400,42 @@
                 
                 fitAddon = new FitAddon.FitAddon();
                 term.loadAddon(fitAddon);
-                term.open(document.getElementById('terminal'));
-                fitAddon.fit();
+                term.open(terminalElement);
                 
-                // Fix Canvas performance warnings by setting willReadFrequently
+                // Wait for terminal to render before fitting
+                setTimeout(() => {
+                    try {
+                        fitAddon.fit();
+                    } catch (e) {
+                        console.log('Initial fit failed, retrying...');
+                        setTimeout(() => fitAddon.fit(), 100);
+                    }
+                }, 50);
+                
+                // Fix Canvas performance warnings
                 setTimeout(() => {
                     const canvases = document.querySelectorAll('#terminal canvas');
                     canvases.forEach(canvas => {
-                        const ctx = canvas.getContext('2d');
-                        if (ctx) {
-                            // Create new context with willReadFrequently option
-                            const newCanvas = document.createElement('canvas');
-                            const newCtx = newCanvas.getContext('2d', { willReadFrequently: true });
-                            // Replace the canvas context
-                            canvas.style.willReadFrequently = 'true';
+                        try {
+                            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                            canvas.willReadFrequently = true;
+                        } catch (e) {
+                            console.log('Canvas optimization skipped');
                         }
                     });
-                }, 100);
+                }, 200);
                 
-                // Handle window resize
+                // Handle window resize with debouncing
+                let resizeTimeout;
                 window.addEventListener('resize', () => {
-                    fitAddon.fit();
+                    clearTimeout(resizeTimeout);
+                    resizeTimeout = setTimeout(() => {
+                        try {
+                            if (fitAddon) fitAddon.fit();
+                        } catch (e) {
+                            console.log('Resize fit failed');
+                        }
+                    }, 100);
                 });
                 
                 // Show initial message
@@ -463,9 +484,24 @@
                 }
                 
                 // Show xterm.js terminal
-                document.getElementById('terminal').style.display = 'block';
+                const terminalElement = document.getElementById('terminal');
+                if (terminalElement) {
+                    terminalElement.style.display = 'block';
+                } else {
+                    console.error('Terminal element not found during connection');
+                    return;
+                }
                 
                 if (CONTAINER_APP_URL) {
+                    // Ensure terminal is initialized
+                    if (!term) {
+                        console.log('Initializing terminal first...');
+                        initTerminal();
+                        // Wait a moment for initialization
+                        setTimeout(() => connectToTerminal(), 100);
+                        return;
+                    }
+                    
                     // Connect to WebSocket terminal proxy
                     const ws = new WebSocket(CONTAINER_APP_URL);
                     
