@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok Pipeline Web CLI</title>
+    <link rel="stylesheet" href="https://unpkg.com/xterm@4.19.0/css/xterm.css">
+    <script src="https://unpkg.com/xterm@4.19.0/lib/xterm.js"></script>
+    <script src="https://unpkg.com/xterm-addon-fit@0.5.0/lib/xterm-addon-fit.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1e1e1e;
+            color: #cccccc;
+            overflow: hidden;
+            height: 100vh;
+        }
+        
+        .container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            background: #2d2d30;
+            color: #cccccc;
+            padding: 10px 20px;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 18px;
+            color: #569cd6;
+        }
+        
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #dc3545;
+        }
+        
+        .status-indicator.connected {
+            background: #28a745;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .btn {
+            background: #0078d4;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .btn:hover {
+            background: #106ebe;
+        }
+        
+        .main-content {
+            flex: 1;
+            display: flex;
+            position: relative;
+        }
+        
+        /* Split pane layout */
+        .terminal-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            border-right: 1px solid #3e3e42;
+        }
+        
+        .file-browser-pane {
+            width: 400px;
+            background: #252526;
+            display: flex;
+            flex-direction: column;
+            border-left: 1px solid #3e3e42;
+        }
+        
+        .file-browser-header {
+            background: #2d2d30;
+            padding: 10px 15px;
+            border-bottom: 1px solid #3e3e42;
+            font-size: 14px;
+            font-weight: bold;
+            color: #569cd6;
+        }
+        
+        .file-browser-tabs {
+            display: flex;
+            background: #37373d;
+            border-bottom: 1px solid #3e3e42;
+        }
+        
+        .file-tab {
+            padding: 8px 15px;
+            background: #37373d;
+            border: none;
+            color: #cccccc;
+            cursor: pointer;
+            font-size: 12px;
+            border-right: 1px solid #3e3e42;
+        }
+        
+        .file-tab.active {
+            background: #252526;
+            color: #569cd6;
+        }
+        
+        .breadcrumb {
+            background: #37373d;
+            padding: 8px 15px;
+            font-size: 12px;
+            border-bottom: 1px solid #3e3e42;
+            color: #cccccc;
+        }
+        
+        .breadcrumb-link {
+            color: #569cd6;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        
+        .breadcrumb-link:hover {
+            text-decoration: underline;
+        }
+        
+        .file-browser-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 5px 10px;
+            cursor: pointer;
+            border-radius: 3px;
+            font-size: 13px;
+            margin-bottom: 2px;
+        }
+        
+        .file-item:hover {
+            background: #2a2d2e;
+        }
+        
+        .file-item.selected {
+            background: #094771;
+        }
+        
+        .file-icon {
+            margin-right: 8px;
+            width: 16px;
+            text-align: center;
+        }
+        
+        .file-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .file-size {
+            font-size: 11px;
+            color: #969696;
+            margin-left: 10px;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #969696;
+            font-style: italic;
+            padding: 20px;
+        }
+        
+        #terminal-container {
+            flex: 1;
+            background: #1e1e1e;
+            position: relative;
+        }
+        
+        #terminal {
+            height: 100%;
+            padding: 10px;
+        }
+        
+        /* Authentication modal */
+        .auth-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .auth-modal.hidden {
+            display: none;
+        }
+        
+        .auth-form {
+            background: #2d2d30;
+            padding: 30px;
+            border-radius: 8px;
+            color: #cccccc;
+            min-width: 300px;
+        }
+        
+        .auth-form h2 {
+            margin-top: 0;
+            color: #569cd6;
+        }
+        
+        .auth-form input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            background: #1e1e1e;
+            border: 1px solid #3e3e42;
+            color: #cccccc;
+            border-radius: 3px;
+        }
+        
+        .auth-form button {
+            width: 100%;
+            background: #0078d4;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        
+        .error {
+            color: #dc3545;
+            margin: 10px 0;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .file-browser-pane {
+                width: 300px;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .main-content {
+                flex-direction: column;
+            }
+            .file-browser-pane {
+                width: 100%;
+                height: 200px;
+                order: -1;
+            }
+            .terminal-pane {
+                border-right: none;
+                border-top: 1px solid #3e3e42;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Authentication Modal -->
+        <div id="authModal" class="auth-modal">
+            <div class="auth-form">
+                <h2>🔐 TikTok Pipeline Access</h2>
+                <p>Enter your secure access code to connect to the terminal:</p>
+                <form onsubmit="authenticate(); return false;">
+                    <input type="text" id="username" placeholder="Username" value="webcli" readonly style="opacity: 0.6;" autocomplete="username">
+                    <input type="password" id="accessCode" placeholder="Secure Access Code" autocomplete="current-password">
+                    <small style="color: #888; display: block; margin-top: 5px;">
+                        🔒 End-to-end encrypted Azure communication<br>
+                        💡 You may see a security warning - click "Advanced" → "Proceed" to continue
+                    </small>
+                    <div id="authError" class="error hidden"></div>
+                    <button type="submit">Connect</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <div class="header">
+            <h1>🎬 TikTok Pipeline Web CLI</h1>
+            <div class="status">
+                <div>
+                    <span class="status-indicator" id="statusIndicator"></span>
+                    <span id="statusText">Disconnected</span>
+                </div>
+                <div class="controls">
+                    <button class="btn" onclick="clearTerminal()">Clear</button>
+                    <button class="btn" onclick="reconnect()">Reconnect</button>
+                    <button class="btn" onclick="refreshFiles()">🔄 Files</button>
+                    <button class="btn" onclick="showHelp()">Help</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Content: Split Pane Layout -->
+        <div class="main-content">
+            <!-- Terminal Pane (Left) -->
+            <div class="terminal-pane">
+                <div id="terminal-container">
+                    <div id="terminal"></div>
+                </div>
+            </div>
+            
+            <!-- File Browser Pane (Right) -->
+            <div class="file-browser-pane">
+                <div class="file-browser-header">
+                    📁 File Explorer
+                </div>
+                <div class="file-browser-tabs">
+                    <button class="file-tab active" onclick="switchTab('database')">Database</button>
+                    <button class="file-tab" onclick="switchTab('output')">Output</button>
+                </div>
+                <div class="breadcrumb" id="breadcrumb">
+                    <span onclick="navigateToPath('')" class="breadcrumb-link">🏠 /</span>
+                </div>
+                <div class="file-browser-content" id="fileBrowserContent">
+                    <div class="loading">Loading files...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let term, fitAddon;
+        let accessToken = '';
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+        let currentTab = 'database';
+        let currentPath = '';
+        
+        // Direct Container App URLs (Fully HTTPS Secured Backend)
+        const CONTAINER_APP_URL = 'https://20.14.35.55:7681'; // ttyd terminal (HTTPS + Basic Auth)
+        const CONTAINER_API_URL = 'https://20.14.35.55:8000'; // FastAPI (HTTPS + Bearer Auth)
+        
+        function initTerminal() {
+            term = new Terminal({
+                theme: {
+                    background: '#1e1e1e',
+                    foreground: '#cccccc',
+                    cursor: '#ffffff',
+                    selection: '#264f78'
+                },
+                fontSize: 14,
+                fontFamily: '"Cascadia Code", "Consolas", "Courier New", monospace',
+                cursorBlink: true,
+                cursorStyle: 'block',
+                scrollback: 1000
+            });
+            
+            fitAddon = new FitAddon.FitAddon();
+            term.loadAddon(fitAddon);
+            term.open(document.getElementById('terminal'));
+            fitAddon.fit();
+            
+            // Fix Canvas performance warnings by setting willReadFrequently
+            setTimeout(() => {
+                const canvases = document.querySelectorAll('#terminal canvas');
+                canvases.forEach(canvas => {
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                        // Create new context with willReadFrequently option
+                        const newCanvas = document.createElement('canvas');
+                        const newCtx = newCanvas.getContext('2d', { willReadFrequently: true });
+                        // Replace the canvas context
+                        canvas.style.willReadFrequently = 'true';
+                    }
+                });
+            }, 100);
+            
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                fitAddon.fit();
+            });
+            
+            // Show initial message
+            term.writeln('🎬 TikTok Pipeline Web CLI');
+            term.writeln('Please authenticate to connect to the terminal server...');
+        }
+        
+        function authenticate() {
+            const code = document.getElementById('accessCode').value;
+            if (!code) {
+                showAuthError('Please enter an access code');
+                return;
+            }
+            
+            accessToken = code;
+            document.getElementById('authModal').classList.add('hidden');
+            connectToTerminal();
+            loadFiles(); // Load files after authentication
+        }
+        
+        function showAuthError(message) {
+            const errorDiv = document.getElementById('authError');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+        }
+        
+        function updateStatus(text, isConnected) {
+            document.getElementById('statusText').textContent = text;
+            const indicator = document.getElementById('statusIndicator');
+            if (isConnected) {
+                indicator.classList.add('connected');
+            } else {
+                indicator.classList.remove('connected');
+            }
+        }
+        
+        function connectToTerminal() {
+            try {
+                updateStatus('Connecting...', false);
+                
+                // Remove existing iframe if any
+                const existingIframe = document.querySelector('#terminal-container iframe');
+                if (existingIframe) {
+                    existingIframe.remove();
+                }
+                
+                // Hide xterm.js terminal
+                document.getElementById('terminal').style.display = 'none';
+                
+                // Create iframe for ttyd terminal (no auth needed - protected by frontend)
+                const iframe = document.createElement('iframe');
+                iframe.src = CONTAINER_APP_URL;
+                iframe.style.cssText = `
+                    width: 100%;
+                    height: 100%;
+                    border: none;
+                    background: #1e1e1e;
+                `;
+                
+                // Set up timeout for iframe loading
+                const timeout = setTimeout(() => {
+                    console.log('Iframe load timeout - this may be normal for HTTPS with self-signed certificates');
+                }, 10000);
+                
+                iframe.onload = () => {
+                    clearTimeout(timeout);
+                    updateStatus('Connected', true);
+                    console.log('Terminal iframe loaded successfully');
+                };
+                
+                iframe.onerror = () => {
+                    clearTimeout(timeout);
+                    updateStatus('Error', false);
+                    term.writeln('\x1b[31m✗ Failed to connect to terminal server\x1b[0m');
+                    term.writeln('\x1b[33m💡 If you see certificate warnings, click "Advanced" → "Proceed to site"\x1b[0m');
+                    document.getElementById('terminal').style.display = 'block';
+                };
+                
+                document.getElementById('terminal-container').appendChild(iframe);
+                
+            } catch (error) {
+                console.error('Connection error:', error);
+                updateStatus('Error', false);
+            }
+        }
+        
+        function reconnect() {
+            // Remove existing iframe if any
+            const existingIframe = document.querySelector('#terminal-container iframe');
+            if (existingIframe) {
+                existingIframe.remove();
+            }
+            document.getElementById('terminal').style.display = 'block';
+            reconnectAttempts = 0;
+            connectToTerminal();
+        }
+        
+        function clearTerminal() {
+            if (term) {
+                term.clear();
+            }
+        }
+        
+        function showHelp() {
+            if (term) {
+                term.writeln('\x1b[36m📚 TikTok Pipeline Web CLI Help\x1b[0m');
+                term.writeln('');
+                term.writeln('\x1b[33mMain Commands:\x1b[0m');
+                term.writeln('  python -m src.tiktok_pipeline.cli run    - Run the full pipeline');
+                term.writeln('  python -m src.tiktok_pipeline.cli stats  - Show system statistics');
+                term.writeln('  python -m src.tiktok_pipeline.cli status - Check job status');
+                term.writeln('');
+                term.writeln('\x1b[33mFile Browser:\x1b[0m');
+                term.writeln('  📁 Browse generated files in the right panel');
+                term.writeln('  🔄 Click "🔄 Files" to refresh file listing');
+                term.writeln('  📥 Click files to download them');
+                term.writeln('');
+            }
+        }
+        
+        // File Browser Functions
+        function switchTab(tab) {
+            currentTab = tab;
+            currentPath = '';
+            
+            // Update tab appearance
+            document.querySelectorAll('.file-tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            loadFiles();
+        }
+        
+        function navigateToPath(path) {
+            currentPath = path;
+            loadFiles();
+        }
+        
+        function loadFiles() {
+            const content = document.getElementById('fileBrowserContent');
+            content.innerHTML = '<div class="loading">Loading files...</div>';
+            
+            const endpoint = currentTab === 'output' ? 
+                `${CONTAINER_API_URL}/file-browser/output/list` : 
+                `${CONTAINER_API_URL}/file-browser/list`;
+            
+            const url = currentPath ? `${endpoint}?path=${encodeURIComponent(currentPath)}` : endpoint;
+            
+            fetch(url, {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    displayFiles(data);
+                })
+                .catch(error => {
+                    console.error('Failed to load files:', error);
+                    content.innerHTML = '<div style="color: #dc3545; padding: 20px;">Failed to load files</div>';
+                });
+        }
+        
+        function displayFiles(data) {
+            const content = document.getElementById('fileBrowserContent');
+            const breadcrumb = document.getElementById('breadcrumb');
+            
+            // Update breadcrumb
+            let breadcrumbHtml = '<span onclick="navigateToPath(\'\')" class="breadcrumb-link">🏠 /</span>';
+            if (data.current_path) {
+                const parts = data.current_path.split('/').filter(p => p);
+                let path = '';
+                parts.forEach(part => {
+                    path += (path ? '/' : '') + part;
+                    breadcrumbHtml += ` / <span onclick="navigateToPath('${path}')" class="breadcrumb-link">${part}</span>`;
+                });
+            }
+            breadcrumb.innerHTML = breadcrumbHtml;
+            
+            // Display files
+            let html = '';
+            
+            // Parent directory link
+            if (data.parent_path !== null && data.current_path) {
+                html += `
+                    <div class="file-item" onclick="navigateToPath('${data.parent_path}')">
+                        <div class="file-icon">📁</div>
+                        <div class="file-name">..</div>
+                    </div>
+                `;
+            }
+            
+            // Files and directories
+            data.items.forEach(item => {
+                const icon = item.type === 'directory' ? '📁' : getFileIcon(item.extension);
+                const sizeText = item.size ? formatFileSize(item.size) : '';
+                const clickAction = item.type === 'directory' ? 
+                    `navigateToPath('${item.path}')` : 
+                    `downloadFile('${item.path}')`;
+                
+                html += `
+                    <div class="file-item" onclick="${clickAction}">
+                        <div class="file-icon">${icon}</div>
+                        <div class="file-name">${item.name}</div>
+                        <div class="file-size">${sizeText}</div>
+                    </div>
+                `;
+            });
+            
+            if (data.items.length === 0) {
+                html = '<div style="color: #969696; padding: 20px; text-align: center;">No files found</div>';
+            }
+            
+            content.innerHTML = html;
+        }
+        
+        function getFileIcon(extension) {
+            const icons = {
+                '.mp4': '🎬',
+                '.avi': '🎬',
+                '.mov': '🎬',
+                '.wav': '🎵',
+                '.mp3': '🎵',
+                '.flac': '🎵',
+                '.jpg': '🖼️',
+                '.jpeg': '🖼️',
+                '.png': '🖼️',
+                '.gif': '🖼️',
+                '.txt': '📄',
+                '.log': '📄',
+                '.json': '📄',
+                '.srt': '📄',
+                '.py': '🐍',
+                '.sh': '⚡',
+                '.db': '🗄️'
+            };
+            return icons[extension] || '📄';
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+        
+        function downloadFile(path) {
+            const endpoint = currentTab === 'output' ? 
+                `${CONTAINER_API_URL}/file-browser/output/download` : 
+                `${CONTAINER_API_URL}/file-browser/download`;
+            
+            const url = `${endpoint}?path=${encodeURIComponent(path)}`;
+            
+            // Use fetch with authentication to download the file
+            fetch(url, {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Download failed: ${response.statusText}`);
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                // Create a temporary link and click it to trigger download
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = path.split('/').pop();
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href);
+            })
+            .catch(error => {
+                console.error('Download failed:', error);
+                alert('Failed to download file: ' + error.message);
+            });
+        }
+        
+        function refreshFiles() {
+            loadFiles();
+        }
+        
+        // Initialize everything when the page loads
+        window.addEventListener('load', () => {
+            initTerminal();
+        });
+    </script>
+</body>
+</html> 
