@@ -789,8 +789,85 @@
             loadFiles();
         }
         
+        // Add DOM mutation observer to track terminal element changes
+        function watchTerminalElement() {
+            const terminalContainer = document.getElementById('terminal-container');
+            if (!terminalContainer) return;
+            
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.type === 'childList') {
+                        const removedNodes = Array.from(mutation.removedNodes);
+                        const addedNodes = Array.from(mutation.addedNodes);
+                        
+                        removedNodes.forEach(node => {
+                            if (node.id === 'terminal') {
+                                console.warn('🚨 Terminal element was removed from DOM!', node);
+                                console.trace('Terminal removal stack trace');
+                                
+                                // Immediately recreate the terminal element if it gets removed
+                                console.log('🔧 Auto-recreating terminal element...');
+                                const newTerminalElement = document.createElement('div');
+                                newTerminalElement.id = 'terminal';
+                                terminalContainer.appendChild(newTerminalElement);
+                            }
+                        });
+                        
+                        addedNodes.forEach(node => {
+                            if (node.id === 'terminal') {
+                                console.log('✅ Terminal element was added to DOM', node);
+                            }
+                        });
+                    }
+                });
+            });
+            
+            observer.observe(terminalContainer, { 
+                childList: true, 
+                subtree: true 
+            });
+            
+            console.log('👀 Watching terminal element for changes...');
+        }
+
+        // Check for potential interference
+        function checkEnvironment() {
+            console.log('🔍 Environment check:');
+            console.log('- Page URL:', window.location.href);
+            console.log('- Protocol:', window.location.protocol);
+            console.log('- User Agent:', navigator.userAgent);
+            console.log('- Extensions detected:', window.chrome && window.chrome.runtime ? 'Yes' : 'No');
+            
+            // Check for common interfering extensions
+            const suspiciousGlobals = ['__REACT_DEVTOOLS_GLOBAL_HOOK__', 'webkitStorageInfo', '__VUE_DEVTOOLS_GLOBAL_HOOK__'];
+            suspiciousGlobals.forEach(global => {
+                if (window[global]) {
+                    console.log(`- Found ${global}:`, !!window[global]);
+                }
+            });
+            
+            // Check Content Security Policy
+            const metaTags = document.querySelectorAll('meta[http-equiv="Content-Security-Policy"]');
+            if (metaTags.length > 0) {
+                console.log('- CSP found:', metaTags[0].content);
+            }
+        }
+
         // Initialize everything when the page loads
         window.addEventListener('load', () => {
+            console.log('🚀 Page loaded, initializing terminal...');
+            checkEnvironment();
+            
+            const terminalElement = document.getElementById('terminal');
+            console.log('Initial terminal element check:', terminalElement);
+            
+            if (terminalElement) {
+                console.log('✅ Terminal element found on page load');
+            } else {
+                console.error('❌ Terminal element missing on page load!');
+            }
+            
+            watchTerminalElement();
             initTerminal();
         });
     </script>
