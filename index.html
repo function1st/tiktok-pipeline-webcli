@@ -533,8 +533,13 @@
                         updateStatus('Connected', true);
                         console.log('Terminal WebSocket connected successfully');
                         
+                        // Clear initial message and focus terminal
+                        term.clear();
+                        term.focus();
+                        
                         // Set up bidirectional communication
                         term.onData(data => {
+                            console.log('Sending data to terminal:', data);
                             if (ws.readyState === WebSocket.OPEN) {
                                 ws.send(data);
                             }
@@ -542,11 +547,19 @@
                     };
                     
                     ws.onmessage = (event) => {
+                        // Clear the initial message on first real terminal data
+                        if (term.buffer && term.buffer.normal.length > 0) {
+                            term.clear();
+                        }
+                        
                         if (event.data instanceof ArrayBuffer) {
                             term.write(new Uint8Array(event.data));
                         } else {
                             term.write(event.data);
                         }
+                        
+                        // Ensure terminal can receive input
+                        term.focus();
                     };
                     
                     ws.onclose = (event) => {
