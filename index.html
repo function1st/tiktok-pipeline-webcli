@@ -478,8 +478,8 @@
             try {
                 updateStatus('Connecting...', false);
                 
-                // Remove existing iframe or message divs (but not the terminal div)
-                const existingElements = document.querySelectorAll('#terminal-container iframe, #terminal-container div:not(#terminal)');
+                // Remove existing iframe or message divs (but not the terminal div or its children)
+                const existingElements = document.querySelectorAll('#terminal-container iframe, #terminal-container > div:not(#terminal)');
                 existingElements.forEach(element => {
                     console.log('Removing old element:', element);
                     element.remove();
