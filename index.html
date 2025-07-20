@@ -524,8 +524,9 @@
                         return;
                     }
                     
-                    // Connect to WebSocket terminal proxy
-                    const ws = new WebSocket(CONTAINER_APP_URL);
+                    // Connect to WebSocket terminal proxy with authentication token
+                    const wsUrl = `${CONTAINER_APP_URL}?token=${encodeURIComponent(accessToken)}`;
+                    const ws = new WebSocket(wsUrl);
                     
                     ws.onopen = () => {
                         updateStatus('Connected', true);
