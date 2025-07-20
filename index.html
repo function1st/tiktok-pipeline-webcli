@@ -157,8 +157,8 @@
         .file-browser-content {
             flex: 1;
             overflow-y: auto;
-            padding: 10px;
-        }
+                padding: 10px;
+            }
         
         .file-item {
             display: flex;
@@ -204,11 +204,11 @@
             padding: 20px;
         }
         
-        #terminal-container {
+            #terminal-container {
             flex: 1;
             background: #1e1e1e;
             position: relative;
-        }
+            }
         
         #terminal {
             height: 100%;
@@ -300,47 +300,47 @@
 </head>
 <body>
     <div class="container">
-        <!-- Authentication Modal -->
-        <div id="authModal" class="auth-modal">
-            <div class="auth-form">
-                <h2>🔐 TikTok Pipeline Access</h2>
-                <p>Enter your secure access code to connect to the terminal:</p>
+    <!-- Authentication Modal -->
+    <div id="authModal" class="auth-modal">
+        <div class="auth-form">
+            <h2>🔐 TikTok Pipeline Access</h2>
+            <p>Enter your secure access code to connect to the terminal:</p>
                 <form onsubmit="authenticate(); return false;">
                     <input type="text" id="username" placeholder="Username" value="webcli" readonly style="opacity: 0.6;" autocomplete="username">
-                    <input type="password" id="accessCode" placeholder="Secure Access Code" autocomplete="current-password">
-                    <small style="color: #888; display: block; margin-top: 5px;">
+            <input type="password" id="accessCode" placeholder="Secure Access Code" autocomplete="current-password">
+            <small style="color: #888; display: block; margin-top: 5px;">
                         🔒 End-to-end encrypted Azure communication<br>
                         💡 You may see a security warning - click "Advanced" → "Proceed" to continue
-                    </small>
-                    <div id="authError" class="error hidden"></div>
+            </small>
+            <div id="authError" class="error hidden"></div>
                     <button type="submit">Connect</button>
                 </form>
-            </div>
         </div>
+    </div>
 
         <!-- Header -->
-        <div class="header">
-            <h1>🎬 TikTok Pipeline Web CLI</h1>
-            <div class="status">
-                <div>
-                    <span class="status-indicator" id="statusIndicator"></span>
-                    <span id="statusText">Disconnected</span>
-                </div>
-                <div class="controls">
-                    <button class="btn" onclick="clearTerminal()">Clear</button>
-                    <button class="btn" onclick="reconnect()">Reconnect</button>
+    <div class="header">
+        <h1>🎬 TikTok Pipeline Web CLI</h1>
+        <div class="status">
+            <div>
+                <span class="status-indicator" id="statusIndicator"></span>
+                <span id="statusText">Disconnected</span>
+            </div>
+            <div class="controls">
+                <button class="btn" onclick="clearTerminal()">Clear</button>
+                <button class="btn" onclick="reconnect()">Reconnect</button>
                     <button class="btn" onclick="refreshFiles()">🔄 Files</button>
-                    <button class="btn" onclick="showHelp()">Help</button>
-                </div>
+                <button class="btn" onclick="showHelp()">Help</button>
             </div>
         </div>
-        
+    </div>
+    
         <!-- Main Content: Split Pane Layout -->
         <div class="main-content">
             <!-- Terminal Pane (Left) -->
             <div class="terminal-pane">
-                <div id="terminal-container">
-                    <div id="terminal"></div>
+    <div id="terminal-container">
+        <div id="terminal"></div>
                 </div>
             </div>
             
@@ -396,28 +396,28 @@
                     return;
                 }
                 
-                term = new Terminal({
-                    theme: {
-                        background: '#1e1e1e',
-                        foreground: '#cccccc',
-                        cursor: '#ffffff',
-                        selection: '#264f78'
-                    },
-                    fontSize: 14,
-                    fontFamily: '"Cascadia Code", "Consolas", "Courier New", monospace',
-                    cursorBlink: true,
-                    cursorStyle: 'block',
-                    scrollback: 1000
-                });
-                
-                fitAddon = new FitAddon.FitAddon();
-                term.loadAddon(fitAddon);
+            term = new Terminal({
+                theme: {
+                    background: '#1e1e1e',
+                    foreground: '#cccccc',
+                    cursor: '#ffffff',
+                    selection: '#264f78'
+                },
+                fontSize: 14,
+                fontFamily: '"Cascadia Code", "Consolas", "Courier New", monospace',
+                cursorBlink: true,
+                cursorStyle: 'block',
+                scrollback: 1000
+            });
+            
+            fitAddon = new FitAddon.FitAddon();
+            term.loadAddon(fitAddon);
                 term.open(terminalElement);
                 
                 // Wait for terminal to render before fitting
                 setTimeout(() => {
                     try {
-                        fitAddon.fit();
+            fitAddon.fit();
                     } catch (e) {
                         console.log('Initial fit failed, retrying...');
                         setTimeout(() => fitAddon.fit(), 100);
@@ -428,7 +428,7 @@
                 
                 // Handle window resize with debouncing
                 let resizeTimeout;
-                window.addEventListener('resize', () => {
+            window.addEventListener('resize', () => {
                     clearTimeout(resizeTimeout);
                     resizeTimeout = setTimeout(() => {
                         try {
@@ -475,9 +475,9 @@
         }
         
         function connectToTerminal() {
-            try {
-                updateStatus('Connecting...', false);
-                
+                         try {
+                 updateStatus('Connecting...', false);
+                 
                 // Remove existing iframe or message divs (but not the terminal div or its children)
                 const existingElements = document.querySelectorAll('#terminal-container iframe, #terminal-container > div:not(#terminal)');
                 existingElements.forEach(element => {
@@ -530,7 +530,7 @@
                     ws.binaryType = 'arraybuffer';
                     
                     ws.onopen = () => {
-                        updateStatus('Connected', true);
+                    updateStatus('Connected', true);
                         console.log('Terminal WebSocket connected successfully');
                         
                         // Clear initial message and focus terminal
@@ -555,15 +555,15 @@
                         if (event.data instanceof ArrayBuffer) {
                             term.write(new Uint8Array(event.data));
                         } else {
-                            term.write(event.data);
+                    term.write(event.data);
                         }
                         
                         // Ensure terminal can receive input
                         term.focus();
-                    };
-                    
+                };
+                
                     ws.onclose = (event) => {
-                        updateStatus('Disconnected', false);
+                    updateStatus('Disconnected', false);
                         console.log('Terminal WebSocket disconnected:', event.code, event.reason);
                         term.writeln('\r\n\x1b[31m✗ Terminal connection closed\x1b[0m');
                         term.writeln('\x1b[33m💡 Refresh the page to reconnect\x1b[0m');
@@ -799,7 +799,7 @@
                 document.body.removeChild(link);
                 URL.revokeObjectURL(link.href);
             })
-            .catch(error => {
+                 .catch(error => {
                 console.error('Download failed:', error);
                 alert('Failed to download file: ' + error.message);
             });
@@ -889,7 +889,7 @@
             
             watchTerminalElement();
             initTerminal();
-        });
+         });
     </script>
 </body>
 </html> 
