@@ -527,6 +527,7 @@
                     // Connect to WebSocket terminal proxy with authentication token
                     const wsUrl = `${CONTAINER_APP_URL}?token=${encodeURIComponent(accessToken)}`;
                     const ws = new WebSocket(wsUrl);
+                    ws.binaryType = 'arraybuffer';
                     
                     ws.onopen = () => {
                         updateStatus('Connected', true);
@@ -541,7 +542,11 @@
                     };
                     
                     ws.onmessage = (event) => {
-                        term.write(event.data);
+                        if (event.data instanceof ArrayBuffer) {
+                            term.write(new Uint8Array(event.data));
+                        } else {
+                            term.write(event.data);
+                        }
                     };
                     
                     ws.onclose = (event) => {
