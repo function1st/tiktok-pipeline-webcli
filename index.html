@@ -478,11 +478,12 @@
             try {
                 updateStatus('Connecting...', false);
                 
-                // Remove existing iframe if any
-                const existingIframe = document.querySelector('#terminal-container iframe, #terminal-container div');
-                if (existingIframe) {
-                    existingIframe.remove();
-                }
+                // Remove existing iframe or message divs (but not the terminal div)
+                const existingElements = document.querySelectorAll('#terminal-container iframe, #terminal-container div:not(#terminal)');
+                existingElements.forEach(element => {
+                    console.log('Removing old element:', element);
+                    element.remove();
+                });
                 
                 // Show xterm.js terminal
                 const terminalElement = document.getElementById('terminal');
